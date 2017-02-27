@@ -1,0 +1,4 @@
+sceneSetups:
+- path: Assets/url_plotting.unity
+  isLoaded: 1
+  isActive: 1
