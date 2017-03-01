@@ -1,79 +1,111 @@
-﻿	using System.Collections.Generic;
-	using UnityEngine.Networking;
-	using UnityEngine;
-	using System.IO;
-	using System;
-	using System.Linq;
-	using System.Collections;
+﻿/*
+This code plots a sphere for each URL on the unity scene. The spheres are placed in sorted order of time on x-axis and are scaled as per the response size. 
+There are 20 URL's in the UrlFile.txt file.
+The time taken to fulfil a request is measured naively using System timer without using any high level API.
+The size is measured as per the length of HTTP response data.
+Date Created: 27th February
+Author:Kushal Vangara
 
+Modified on 28th February 
+*/
+
+using UnityEngine;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine.Networking;
 public class url_demo : MonoBehaviour {
-	string[] lines = System.IO.File.ReadAllLines("Assets/UrlFile.txt");
-	int i=0;
-	//Vector3 camView = new Vector3(6.17f, 2.25f, -6.14f);
-	//SortedList mySL = new SortedList();
-	//Dictionary dictionary = new Dictionary<string, int>();
-	Hashtable hashtable = new Hashtable();
+
+	GameObject mainCamera;
+	string[] lines = System.IO.File.ReadAllLines("Assets/UrlFile.txt"); //URL's source file
+	SortedDictionary<float, string> urls = new SortedDictionary<float,string> (); //map time, url name and response size
+	byte[] results; //response bytes
+	string[] urlsLine; //array for url's
+	int i=0, y=0,f=0; //counters and scaling variable
+	float x = 10F;   // x-axis padding spacing between spheres
+	float elapsedMs=0f, temp=0f;  // variables for calculating time
+	bool flag=false; 
+
 	void Start () {
-//		camView = GameObject.Find("Main Camera").transform.position;
+		urlsLine = new string[lines.Length];
+		mainCamera = GameObject.Find ("Main Camera");
 		foreach (string line in lines)
 		{
-			print (line);
-			var watch = System.Diagnostics.Stopwatch.StartNew();
-			StartCoroutine(GetText());
-			double elapsedMs = watch.ElapsedMilliseconds;
-			watch.Stop();
-
-			print (elapsedMs);
+			urlsLine [i] = line;
+			StartCoroutine (GetText ());
 			i++;
-			hashtable.Add (line,elapsedMs);
-			//mySL.Add(line,elapsedMs);
-			//dictionary.Add(line, elapsedMs);
 
 		}
-			
-		/*for ( int i = 0; i < mySL.Count; i++ )  {
-			print( "Key= "+ mySL.GetKey(i) +"Value="+ mySL.GetByIndex(i));
-		}*/
-			
-		//hashtable.Cast<DictionaryEntry>().OrderBy(entry => entry.Value).ToList()
-		float x = 0.5F;
+		mainCamera.transform.position = new Vector3(788, 876, -14); // default camera view 
 
-		foreach (DictionaryEntry entry in hashtable)
-		{
-			print( "Key= "+ entry.Key +"Value="+ entry.Value);
-			GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-			sphere.name = Convert.ToString (entry.Key);
-			int y = Convert.ToInt16 (entry.Value);
-			sphere.transform.position = new Vector3(10F+x,10, 10);
-			//transform.localScale += new Vector3(x+0.1F, x+0.1F, x+0.1F);
-			sphere.transform.localScale = new Vector3(y, y, y);
-
-			x++;
-		}
-			
-	
-
-	}
+		mainCamera.transform.rotation = Quaternion.Euler(90, 0, 0);  
+	  }
 
 	IEnumerator GetText() {
-		using(UnityWebRequest www = UnityWebRequest.Get(lines[i])) {
-			print ("GET REQUEST SENT");
-			yield return www.Send();
-			//print (www.Send());
-			if(www.isError) {
-				Debug.Log(www.error);
-			}
-			else {
-				// Show results as text
-				Debug.Log(www.downloadHandler.text);
+			temp = Time.time;
+			using(UnityWebRequest www = UnityWebRequest.Get(urlsLine[i])) {
+				print ("GET Request Sending to URL's...");
+				yield return www.Send();
+				
+				if(www.isError) {
+					Debug.Log(www.error);
+				}
 
-				// Or retrieve results as binary data
-				byte[] results = www.downloadHandler.data;
+				else {
+					results = www.downloadHandler.data;
+				}
+
+				urls.Add (elapsedMs, urlsLine[f]+"\t"+results.Length.ToString()); 
+				elapsedMs = (Time.time - temp) * 1000;
+				print ("Url #"+ (f+1) + " is " + urlsLine[f]+"  Time= "+elapsedMs+"  Size="+results.Length);
+				f++;
+
+				if (f == urlsLine.Length) { //to iterate over all the url's then plot the spheres
+					flag = true;
+					print ("Task Finished");
+				}
+
 			}
+
 		}
+
+	void LateUpdate(){
+
+		if (flag) {
+			foreach (var kvp in urls) {
+					//print ("Key= " + kvp.Key + "Value=" + kvp.Value);
+					GameObject sphere = GameObject.CreatePrimitive (PrimitiveType.Sphere);
+					sphere.name = Convert.ToString (kvp.Value);
+					int index = kvp.Value.IndexOf ("\t");
+					string subs = kvp.Value.Substring (index + 1);
+					y = (int.Parse (subs));
+
+					//Normalizing scaling factor w.r.t the response size 
+					if (y >= 200000)
+						y = 50;
+					else if (y >= 100000)
+						y = 40;
+					else if (y >= 50000)
+						y = 33;
+					else if (y >= 10000)
+						y = 25;
+					else if (y >= 5000)
+						y = 18;
+					else if (y > 1000)
+						y = 13;
+					else
+						y = 10;
+				
+
+				sphere.transform.position = new Vector3 (x, 100, 20);
+				sphere.GetComponent<Renderer> ().material.color = new Color (0, 0, 255F);
+				sphere.transform.localScale = new Vector3(y, y, y);
+				x = x + 80;
+			}
+
+			flag = false;
+		}
+
 	}
+
 }
-
-	
-	
-
